@@ -6,7 +6,7 @@ A file conversion microservice. This app provides an interface for [our `convert
 
 ### 1. Clone the repository
 ```sh
-git clone git@github.com/curiousmarkingsco/convertSage
+git clone git@github.com:curiousmarkingsco/convertSage.git
 cd convertSage
 ```
 
