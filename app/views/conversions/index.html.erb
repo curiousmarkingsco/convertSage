@@ -1,0 +1,148 @@
+<div class="min-h-screen w-full flex flex-col items-center p-6">
+  <h1 class="text-5xl font-thin mb-6 font-sans text-center">convert<span class="font-serif font-black text-7xl">Sage</span> <br><span class="text-3xl">File Converter</span></h1>
+
+  <div id="file-upload-container" class="w-full max-w-lg bg-romantic-100 rounded-2xl shadow-lg p-6">
+    <form id="file-conversion-form" action="/conversions" method="post" enctype="multipart/form-data" data-remote="true" class="space-y-4">
+      <input type="hidden" name="authenticity_token" value="<%= form_authenticity_token %>">
+
+      <div id="drop-area" class="flex flex-col items-center justify-center border-2 border-dashed border-mine-shaft-300 p-8 rounded-md hover:bg-mine-shaft-50 transition">
+        <p class="text-mine-shaft-500 text-center">Drag and drop your files here</p>
+        <p class="text-mine-shaft-400 text-sm">or</p>
+        <button id="file-upload-button" type="button" class="bg-gray-asparagus-500 text-white px-4 py-2 rounded hover:bg-gray-asparagus-600 transition">Upload Files</button>
+        <input id="file-input" type="file" name="files[]" class="hidden" multiple>
+      </div>
+
+      <div>
+        <label for="convert-from" class="block text-sm font-medium text-mine-shaft-700">Convert From</label>
+        <select name="convert_from" id="convert-from" class="mt-1 block border border-gray-asparagus-500 w-full border-mine-shaft-300 rounded-md shadow-sm focus:ring-gray-asparagus-500 focus:border-gray-asparagus-500 focus:outline-none active:ring-gray-asparagus-500 active:ring active:outline-none">
+          <option value="png">PNG</option>
+          <option value="jpg">JPG</option>
+          <option value="gif">GIF</option>
+          <option value="mp4">MP4</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="convert-to" class="block text-sm font-medium text-mine-shaft-700">Convert To</label>
+        <select name="convert_to" id="convert-to" class="mt-1 block border border-gray-asparagus-500 w-full border-mine-shaft-300 rounded-md shadow-sm focus:ring-gray-asparagus-500 focus:border-gray-asparagus-500 focus:outline-none active:ring-gray-asparagus-500 active:ring active:outline-none" disabled>
+          <!-- Options dynamically updated based on "Convert From" selection -->
+        </select>
+      </div>
+
+      <div>
+        <label for="optimize-image" class="inline-flex items-center">
+          <input id="optimize-image" type="checkbox" name="optimize_image" class="form-checkbox h-5 w-5 text-gray-asparagus-600">
+          <span class="ml-2 text-mine-shaft-700">Optimize Image (reduce file size)</span>
+        </label>
+      </div>
+
+      <button id="start-converting" type="submit" class="bg-romantic-500 text-black font-bold px-4 py-2 rounded hover:bg-romantic-600 transition w-full">Start Converting</button>
+    </form>
+  </div>
+
+  <div id="conversion-results" class="w-full max-w-lg bg-white rounded-lg shadow-lg p-6 mt-6 hidden">
+    <h2 class="text-lg font-bold mb-4">Conversion Results</h2>
+    <ul id="results-list" class="list-disc list-inside">
+      <!-- Converted files will be listed here -->
+    </ul>
+  </div>
+</div>
+
+<script>
+  const convertFromOptions = {
+    png: ['jpg', 'gif', 'webp', 'avif', 'bmp', 'ico'],
+    jpg: ['png', 'gif', 'webp', 'avif', 'bmp', 'ico'],
+    gif: ['jpg', 'png', 'webp', 'avif', 'bmp', 'ico'],
+    mp4: ['mp3', 'gif', 'webm', 'avi']
+  };
+
+  const fileInput = document.getElementById('file-input');
+  const fileUploadButton = document.getElementById('file-upload-button');
+  const dropArea = document.getElementById('drop-area');
+  const convertFrom = document.getElementById('convert-from');
+  const convertTo = document.getElementById('convert-to');
+  const conversionResults = document.getElementById('conversion-results');
+  const resultsList = document.getElementById('results-list');
+
+  // Drag and drop functionality
+  dropArea.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    dropArea.classList.add('bg-mine-shaft-50');
+  });
+
+  dropArea.addEventListener('dragleave', () => {
+    dropArea.classList.remove('bg-mine-shaft-50');
+  });
+
+  dropArea.addEventListener('drop', (e) => {
+    e.preventDefault();
+    dropArea.classList.remove('bg-mine-shaft-50');
+    fileInput.files = e.dataTransfer.files;
+  });
+
+  fileUploadButton.addEventListener('click', () => fileInput.click());
+
+  // Update "Convert To" dropdown based on "Convert From" selection
+  convertFrom.addEventListener('change', () => {
+    const selectedFrom = convertFrom.value;
+    convertTo.innerHTML = '';
+    if (convertFromOptions[selectedFrom]) {
+      convertFromOptions[selectedFrom].forEach((option) => {
+        const opt = document.createElement('option');
+        opt.value = option;
+        opt.textContent = option.toUpperCase();
+        convertTo.appendChild(opt);
+      });
+      convertTo.disabled = false;
+    } else {
+      convertTo.disabled = true;
+    }
+  });
+
+  document.getElementById('file-conversion-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+
+  const form = event.target;
+  const formData = new FormData(form);
+
+  try {
+    const response = await fetch(form.action, {
+      method: 'POST',
+      headers: {
+        'X-CSRF-Token': document.querySelector('meta[name="csrf-token"]').content,
+        'Accept': 'application/json',
+      },
+      body: formData,
+    });
+
+    if (!response.ok) throw new Error('Error processing the request.');
+
+    const result = await response.json();
+    displayResults(result);
+  } catch (error) {
+    console.error('Error:', error);
+    alert('An error occurred during conversion.');
+  }
+});
+
+function displayResults(result) {
+  const resultsList = document.getElementById('results-list');
+  resultsList.innerHTML = '';
+  const conversionResults = document.getElementById('conversion-results');
+  conversionResults.classList.remove('hidden');
+
+  result.files.forEach((file) => {
+    const listItem = document.createElement('li');
+    listItem.textContent = `${file.original_name} converted to ${file.format.toUpperCase()}`;
+
+    const downloadLink = document.createElement('a');
+    downloadLink.href = file.download_url;
+    downloadLink.textContent = 'Download';
+    downloadLink.download = file.download_name;
+    downloadLink.classList.add('ml-4', 'text-gray-asparagus-500', 'hover:underline');
+
+    listItem.appendChild(downloadLink);
+    resultsList.appendChild(listItem);
+  });
+}
+</script>
